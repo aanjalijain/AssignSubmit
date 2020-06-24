@@ -116,12 +116,20 @@ public abstract class Comparer
 		{
 			details = inList.get(i);
 			if (details.getName() != null && details.getName().equals(inName)) {
-				 File file = new File(inName); 
-				 Path outDir = Paths.get(inName);
-					    Scanner sc = new Scanner(file); 
-					  
-					    while (sc.hasNextLine()) 
-					      System.out.println(sc.nextLine()); 
+				ZipEntry zipEntry = zip.getEntry(inName);
+				/*InputStream inputStream = zip.getInputStream(zipEntry);
+				 int data = inputStream.read();
+                 while(data != -1){
+                     data = inputStream.read();
+                     System.out.println(data);
+                 }*/
+                 try (InputStream fis = zip.getInputStream(zipEntry);
+                         InputStreamReader isr = new InputStreamReader(fis,
+                                 StandardCharsets.UTF_8);
+                         BufferedReader br = new BufferedReader(isr)) {
+
+                     br.lines().forEach(line -> System.out.println(line));
+                 }
 				return details;
 			}
 		}
