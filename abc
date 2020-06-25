@@ -1,0 +1,77 @@
+private static EntryDetails getEntryFromList(ArrayList<EntryDetails> inList, String inName,ZipFile zip,ZipFile zipJar1) throws IOException
+	{
+		EntryDetails details = null;
+		String line1="";
+		String line2="";
+		boolean areEqual = true;
+		for (int i=0; i<inList.size(); i++)
+		{
+			details = inList.get(i);
+			if (details.getName() != null && details.getName().equals(inName)) {
+				ZipEntry zipEntry = zip.getEntry(inName);
+                ZipEntry zipEntryJar1 = zipJar1.getEntry(details.getName());
+                int lineNum=1;
+                 try{
+                	
+                	 InputStream fis = zip.getInputStream(zipEntry);
+
+                     InputStreamReader isr = new InputStreamReader(fis,
+                             StandardCharsets.UTF_8);
+                    
+            		 BufferedReader br = new BufferedReader(isr);
+            		
+            		 line1 = br.readLine();
+                     br.lines().forEach(line -> System.out.println(line));
+            	//Print the file for jarpoc1 data
+                	 InputStream fiss = zipJar1.getInputStream(zipEntryJar1);
+                     InputStreamReader isrr = new InputStreamReader(fiss,StandardCharsets.UTF_8);
+            		 BufferedReader  buffr = new BufferedReader(isrr);
+                	line2 = buffr.readLine();
+                	buffr.lines().forEach(
+                			linee -> {
+                				System.out.println(linee);
+                				
+                			}
+                			);
+                	
+                	System.out.println(br.lines().equals(buffr.lines()));
+                	 while ( br.read()==-1 || buffr.read()==-1)
+                     {
+                		 if(line1 == null || line2 == null)
+                         {
+                             areEqual = false;
+                              
+                             break;
+                         }
+                         else if(! line1.equalsIgnoreCase(line2))
+                         {
+                             areEqual = false;
+                              
+                             break;
+                         }
+                         line1 = br.readLine();
+                          
+                         line2 = buffr.readLine();
+                          
+                         lineNum++;
+                     }
+                	 if(areEqual)
+                     {
+                         System.out.println("Two files have same content.");
+                     }
+                     else
+                     {
+                         System.out.println("Two files "+inName+" have different content. They differ at line "+lineNum);
+                          
+                         System.out.println("File1 has "+line1+" and File2 has "+line2+" at line "+lineNum);
+                     }
+                 }catch(Exception e){
+                	 
+                 }
+            
+                
+				return details;
+			}
+		}
+		return null;
+	}
