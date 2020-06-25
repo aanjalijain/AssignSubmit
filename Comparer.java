@@ -1,15 +1,29 @@
 package com.pkg.compare;
 
 
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.FileReader;
+import java.io.FileWriter;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.Reader;
+import java.lang.reflect.Method;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.attribute.FileTime;
 import java.util.ArrayList;
 import java.util.Enumeration;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.Scanner;
+import java.util.jar.JarEntry;
+import java.util.jar.JarFile;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
@@ -21,6 +35,7 @@ import java.util.zip.ZipFile;
  */
 public abstract class Comparer
 {
+	private static final int NOT_FOUND = -1;
 	/**
 	 * Compare the two given files and return the results
 	 * @param inFile1 first file
@@ -37,10 +52,10 @@ public abstract class Comparer
 		// Make empty list
 		ArrayList<EntryDetails> entryList = new ArrayList<EntryDetails>();
 		// load first file, make entrydetails object for each one
-		final int numFiles1 = makeEntries(entryList, inFile1, 0);
+		final int numFiles1 = makeEntries(entryList, inFile1,inFile2, 0);
 		results.setNumFiles(0, numFiles1);
 		// load second file, try to find entrydetails for each file or make new one
-		final int numFiles2 = makeEntries(entryList, inFile2, 1);
+		final int numFiles2 = makeEntries(entryList, inFile1,inFile2, 1);
 		results.setNumFiles(1, numFiles2);
 		results.setEntryList(entryList);
 
@@ -61,28 +76,42 @@ public abstract class Comparer
 	 * @param inIndex 0 for first file, 1 for second
 	 * @return number of files found
 	 */
-	private static int makeEntries(ArrayList<EntryDetails> inList, File inFile, int inIndex)
+	private static int makeEntries(ArrayList<EntryDetails> inList, File inFile,File inFile2, int inIndex)
 	{
 		System.out.println("inList"+inList);
 		System.out.println("inFile"+inFile);
 		System.out.println("inIndex"+inIndex);
 		boolean checkList = (inList.size() > 0);
 		int numFiles = 0;
-		ZipFile zip = null;
+		JarFile zip=null;
+		JarFile zipJar1=null;
 		try
 		{
-			zip = new ZipFile(inFile);
+			if(inIndex==0){
+				zip = new JarFile(inFile);
+				
+			}else{
+				zipJar1 = new JarFile(inFile);
+				zip = new JarFile(inFile2);
+			}
 			Enumeration<?> zipEntries = zip.entries();
 			while (zipEntries.hasMoreElements())
 			{
-				ZipEntry ze = (ZipEntry) zipEntries.nextElement();
+				JarEntry ze = (JarEntry) zipEntries.nextElement();
 				numFiles++;
+			
+				/* java.io.InputStream is = zip.getInputStream(ze); // get the input stream
+				    java.io.FileOutputStream fos = new java.io.FileOutputStream(f);
+				    while (is.available() > 0) {  // write contents of 'is' to 'fos'
+				        fos.write(is.read());
+				    }*/
 				String name = ze.getName();
 				FileTime time=ze.getLastModifiedTime();
-				System.out.println(ze.getMethod());
-				
 				EntryDetails details = null;
-				if (checkList) {details = getEntryFromList(inList, name);}
+			
+				if (checkList) {
+					details = getEntryFromList(inList, name,zip,zipJar1);
+					}
 				// Construct new details object if necessary
 				if (details == null)
 				{
@@ -92,6 +121,10 @@ public abstract class Comparer
 				}
 				// set size
 				details.setSize(inIndex, ze.getSize());
+				/*if("CHANGED_SIZE".equals(details.getStatus())){
+					
+				}
+				System.out.println(details.getStatus());*/
 			}
 		}
 		catch (IOException ioe) {
@@ -107,82 +140,122 @@ public abstract class Comparer
 	 * Look up the given name in the list
 	 * @param inList list of EntryDetails objects
 	 * @param inName name to look up
-	 * @throws FileNotFoundException 
+	 * @throws IOException 
 	 */
-	private static EntryDetails getEntryFromList(ArrayList<EntryDetails> inList, String inName,ZipFile zip,ZipFile zipJar1) throws IOException
+	private static EntryDetails getEntryFromList(ArrayList<EntryDetails> inList, String inName,JarFile zip,JarFile zipJar1) throws IOException
 	{
 		EntryDetails details = null;
-		String line1="";
-		String line2="";
-		boolean areEqual = true;
 		for (int i=0; i<inList.size(); i++)
 		{
 			details = inList.get(i);
 			if (details.getName() != null && details.getName().equals(inName)) {
 				ZipEntry zipEntry = zip.getEntry(inName);
+				System.out.println(zipEntry.getName().getClass());
+				 if (zipEntry.isDirectory()) {
+                   System.out.println(  new File(File.separator + zipEntry.getName())
+                                     .mkdirs());
+                 } 
                 ZipEntry zipEntryJar1 = zipJar1.getEntry(details.getName());
-                int lineNum=1;
-                 try{
-                	
-                	 InputStream fis = zip.getInputStream(zipEntry);
-                     InputStreamReader isr = new InputStreamReader(fis,
-                             StandardCharsets.UTF_8);
-            		 BufferedReader br = new BufferedReader(isr);
-            		 line1 = br.readLine();
-                     br.lines().forEach(line -> System.out.println(line));
+                try{
+               	
+               	 InputStream fis = zip.getInputStream(zipEntry);
+
+                 InputStreamReader isr = new InputStreamReader(fis,
+                            StandardCharsets.UTF_8);
+                   
+           		 BufferedReader br = new BufferedReader(isr);
+                    br.lines().forEach(line -> System.out.println(line));
             	//Print the file for jarpoc1 data
-                	 InputStream fiss = zipJar1.getInputStream(zipEntryJar1);
-                     InputStreamReader isrr = new InputStreamReader(fiss,StandardCharsets.UTF_8);
-            		 BufferedReader  buffr = new BufferedReader(isrr);
-                	line2 = buffr.readLine();
-                	buffr.lines().forEach(
-                			linee -> {
-                				System.out.println(linee);
-                				
-                			}
-                			);
-                	
-                	System.out.println(br.lines().equals(buffr.lines()));
-                	 while (line1 != null ||  line2 != null )
-                     {
-                		 if(line1 == null || line2 == null)
-                         {
-                             areEqual = false;
-                              
-                             break;
-                         }
-                         else if(! line1.equalsIgnoreCase(line2))
-                         {
-                             areEqual = false;
-                              
-                             break;
-                         }
-                         line1 = br.readLine();
-                          
-                         line2 = buffr.readLine();
-                          
-                         lineNum++;
-                     }
-                	 if(areEqual)
-                     {
-                         System.out.println("Two files have same content.");
-                     }
-                     else
-                     {
-                         System.out.println("Two files "+inName+" have different content. They differ at line "+lineNum);
-                          
-                         System.out.println("File1 has "+line1+" and File2 has "+line2+" at line "+lineNum);
-                     }
-                 }catch(Exception e){
-                	 
-                 }
-            
-                
+               	 InputStream fiss = zipJar1.getInputStream(zipEntryJar1);
+                 InputStreamReader isrr = new InputStreamReader(fiss,StandardCharsets.UTF_8);
+           		 BufferedReader  buffr = new BufferedReader(isrr);
+               	 buffr.lines().forEach(
+               			linee -> {
+               				System.out.println(linee);
+               				});
+             	try{
+               	if("class".equals(getExtension(inName))){
+               	File f = new File(inName);  
+              
+               	System.out.println(f.getAbsolutePath().substring(f.getAbsolutePath().lastIndexOf("\\")+1));
+               	String className=f.getAbsolutePath().substring(f.getAbsolutePath().lastIndexOf("\\")+1);
+               
+                Object classobj = Class.forName(className);
+               	Method[] methods = ((Class<? extends String>) classobj).getMethods();
+                for (Method method : methods) { 
+                	  
+                    String MethodName = method.getName(); 
+                    System.out.println("Name of the method: "
+                                       + MethodName); 
+                } 
+               		
+               	}
+               	}catch(Exception ex){
+               		System.out.println(ex.getMessage());
+               	}
+               //	
+                //System.out.println(contentEqualsIgnoreEOL(fileReader,fileReader2));
+                }catch(Exception e){
+               	 
+                }
+           
+               
 				return details;
 			}
 		}
 		return null;
 	}
+	 public static String getExtension(final String filename) {
+		         if (filename == null) {
+		            return null;
+		        }
+		        final int index = indexOfExtension(filename);
+		        if (index == NOT_FOUND) {
+		           return "";
+		        } else {
+		           return filename.substring(index + 1);
+		       }
+		    }
+	 public static int indexOfExtension(final String filename) {
+		        if (filename == null) {
+		            return NOT_FOUND;
+		        }
+		        final int extensionPos = filename.lastIndexOf('.');
+		        final int lastSeparator = indexOfLastSeparator(filename);
+		        return lastSeparator > extensionPos ? NOT_FOUND : extensionPos;
+		    }
+	 
+	 public static int indexOfLastSeparator(final String filename) {
+		       if (filename == null) {
+		            return NOT_FOUND;
+		       }
+		      final int lastUnixPos = filename.lastIndexOf("/");
+		      final int lastWindowsPos = filename.lastIndexOf("\\");
+		        return Math.max(lastUnixPos, lastWindowsPos);
+		    }
+	public static boolean contentEqualsIgnoreEOL(final Reader input1, final Reader input2)
+	          throws IOException {
+	        if (input1 == input2) {
+	            return true;
+	       }
+	       if (input1 == null ^ input2 == null) {
+	            return false;
+	        }
+	       final BufferedReader br1 = toBufferedReader(input1);
+	       final BufferedReader br2 = toBufferedReader(input2);
+
+	       String line1 = br1.readLine();
+	       String line2 = br2.readLine();
+	        while (line1 != null && line1.equals(line2)) {
+	            line1 = br1.readLine();
+	            line2 = br2.readLine();
+	       }
+	       return Objects.equals(line1, line2);
+	    }
+	
+	 public static BufferedReader toBufferedReader(final Reader reader) {
+		 return reader instanceof BufferedReader ? (BufferedReader) reader : new BufferedReader(reader);
+		 }
 
 	/**
 	 * Calculate the md5 sums of all relevant entries
