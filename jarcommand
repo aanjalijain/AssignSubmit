@@ -1,0 +1,13 @@
+String command ="cmd.exe /c start java jar cvf C:\\Users\\anjajain\\jarTrial\\CheckJar.jar "+diffFileColl.get(0);
+			Runtime.getRuntime().exec(command);
+      
+      
+      /This one is executed successfully
+      String command ="cmd.exe /c start dir";
+		 Process ps=Runtime.getRuntime().exec(command);
+	        ps.waitFor();
+	        java.io.InputStream is=ps.getInputStream();
+	        System.out.println(is.read());
+	        byte b[]=new byte[is.available()];
+	        is.read(b,0,b.length);
+	        System.out.println(new String(b));
